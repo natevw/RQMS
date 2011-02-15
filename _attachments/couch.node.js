@@ -79,6 +79,11 @@ function External2(callback, options) {
     var url = require('url');
     var qs = require('querystring');
     
+    // catch exceptions and log them, let timeout handler return 500.
+    process.on('uncaughtException', function (err) {
+      console.log(err.message);
+    });
+    
     var server = http.createServer(function (req, res) {
         var path_parts = url.parse(req.url);
         
@@ -94,7 +99,19 @@ function External2(callback, options) {
             wrappedReq.body += chunk;
         });
         req.on('end', function () {
+            var waiting = setTimeout(function () {
+                console.log("Timed out waiting for response, sending error back to client.");
+                res.writeHead(500, {'Content-Type':'application/json'});
+                res.end(JSON.stringify({error:true, message:"Internal error processing request"}), 'utf8');
+                waiting = null;
+            }, 2000);
             callback(wrappedReq, function (wrappedRes) {
+                if (!waiting) {
+                    // request has already failed
+                    return;
+                } else {
+                    clearTimeout(waiting);
+                }
                 var type = 'application/octet-stream';
                 if (wrappedRes.json) {
                     type = 'application/json';
