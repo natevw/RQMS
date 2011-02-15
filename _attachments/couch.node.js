@@ -72,6 +72,56 @@ function External(callback) {
     });
 }
 
+// same callback code, but hosted directly as HTTP server
+// e.g. http://davispj.com/2010/09/26/new-couchdb-externals-api.html
+function External2(callback, options) {
+    var http = require('http');
+    var url = require('url');
+    var qs = require('querystring');
+    
+    var server = http.createServer(function (req, res) {
+        var path_parts = url.parse(req.url);
+        
+        var wrappedReq = {};
+        wrappedReq.method = req.method;
+        wrappedReq.path = path_parts.pathname.split('/').slice(1);
+        wrappedReq.query = qs.parse(path_parts.query);
+        wrappedReq.headers = req.headers;   // TODO: match CouchDB's key case?
+        
+        wrappedReq.body = "";
+        req.setEncoding('utf8');
+        req.on('data', function (chunk) {
+            wrappedReq.body += chunk;
+        });
+        req.on('end', function () {
+            callback(wrappedReq, function (wrappedRes) {
+                var type = 'application/octet-stream';
+                if (wrappedRes.json) {
+                    type = 'application/json';
+                    wrappedRes.body = JSON.stringify(wrappedRes.json);
+                } else if (wrappedRes.body) {
+                    type = 'text/html';
+                }
+                var headers = wrappedRes.headers || {};
+                // TODO: normalize case of header keys
+                headers['Content-Type'] || (headers['Content-Type'] = type);
+                
+                res.writeHead(wrappedRes.code || 200, headers);
+                if (wrappedRes.body) {
+                    res.end(wrappedRes.body, 'utf8');
+                } else if (wrappedRes.base64) {
+                    // for some reason res.end(wrappedRes.base64, 'base64') hangs
+                    res.end(new Buffer(wrappedRes.base64, 'base64'));
+                } else {
+                    res.end();
+                }
+            });
+        });
+    });
+    server.listen(options.port, options.host);
+}
+
 
 exports.Database = Database;
 exports.External = External;
+exports.External2 = External2;
