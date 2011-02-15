@@ -1,0 +1,4 @@
+{
+    "name": "Relaxed Queue Management System",
+    "description": "Simple low-latency job/message distribution manager using CouchDB for reliable persistence"
+}
