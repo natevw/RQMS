@@ -19,9 +19,10 @@ function deleteItem(db, id, rev, asyncReturn) {
 }
 function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
-        db.get("_all_docs", {include_docs:true, skip:params.skip, limit:params.limit}, function (response) {
-            returnCount(response.rows.length);
-            if (!response.rows.length) {
+        db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
+            var lastRow = response.rows.pop();
+            returnCount(response.rows.length, lastRow.id);
+            if (!lastRow) {
                 yieldItem(null);
             }
             response.rows.forEach(function (row) {
@@ -50,10 +51,10 @@ function getItems(db, num_desired, item_timeout, respond) {
     
     var items = [];
     var deadline = Date.now() + 250;    // gather items for a quarter second tops
-    var limit = num_desired, skip = 0;
+    var limit = num_desired, start = null;
     function attempt() {
         var remainingItems, fetchCount;
-        gather({limit:limit, skip:skip}, function (count) { remainingItems = fetchCount = count; }, function (item) {
+        gather({limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
             remainingItems -= 1;
             if (item) {
                 items.push(item);
@@ -62,7 +63,7 @@ function getItems(db, num_desired, item_timeout, respond) {
             if (remainingItems < 1) {
                 limit = num_desired - items.length;
                 if (fetchCount === num_desired && limit && Date.now() < deadline) {
-                    console.log("RETRY on", num_desired, "items, skip now", skip);
+                    console.log("RETRY on fetch of", num_desired, "items");
                     process.nextTick(attempt);
                 } else {
                     if (fetchCount === num_desired && limit) {
@@ -72,7 +73,6 @@ function getItems(db, num_desired, item_timeout, respond) {
                 }
             }
         });
-        skip += limit;
     }
     attempt();
 }
