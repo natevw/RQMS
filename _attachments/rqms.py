@@ -51,7 +51,9 @@ class Queue(object):
     class _DequeuedItem(dict):
         def __init__(self, server_item):
             self.ticket = server_item['ticket']
-            self.update(server_item['value'])
+            self.value = server_item['value']
+            if isinstance(self.value, dict):
+                self.update(self.value)
     
     def _get(self):
         while not len(self._batch):
