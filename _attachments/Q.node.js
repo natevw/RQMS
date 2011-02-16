@@ -1,9 +1,8 @@
-#! /Users/nathan/sw/bin/node
-//#! /usr/bin/env node
+var SERVER = "http://localhost:5984/";
+var Q_TYPE = "net.stemstorage.queue-item";
 
 
 // queue primitives
-var Q_TYPE = "net.stemstorage.queue-item";
 function putItem(db, id, value, asyncReturn) {
     var doc = {};
     doc[Q_TYPE] = true;
@@ -77,8 +76,9 @@ function getItems(db, num_desired, item_timeout, respond) {
 
 
 
+
 var couch = require('./couch.node.js');
-var db = new couch.Database("http://localhost:5984/qtest");
+var fakeDB = new couch.Database(SERVER + "for_uuids");
 
 couch.External2(function (req, respond) {
     //return respond({body:"<h1>Hello World!</h1>\n<pre>\n" + JSON.stringify(req, null, 4) + "</pre>"});
@@ -88,6 +88,7 @@ couch.External2(function (req, respond) {
         return;
     }
     
+    var db = new couch.Database(SERVER + req.path[0]);
     if (req.method === "GET") {
         getItems(db, parseInt(req.query.count || 1), parseFloat(req.query.time || 10.0), respond);
     } else if (req.method === "DELETE") {
@@ -122,4 +123,4 @@ couch.External2(function (req, respond) {
         });
     }
     
-}, {port:8888, db:db});
+}, {port:8888, db:fakeDB});
