@@ -18,21 +18,21 @@ function deleteItem(db, id, rev, asyncReturn) {
         asyncReturn(status === 200, status, response);
     });
 }
+var pendingClaims = {};
 function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
-        var num_found = 0;
+        var num_attempted = 0;
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
             var nextRow = (response.rows.length > 1) ? response.rows.pop() : null;
             returnCount(response.rows.length || 1, nextRow && nextRow.id);
             if (!response.rows.length) {
-                yieldItem(null);
+                return yieldItem(null);
             }
             response.rows.forEach(function (row) {
                 var doc = row.doc;
                 if (!doc[Q_TYPE]) {
                     return yieldItem(null);
                 }
-                
                 if (doc.locked_until) {
                     var timeNow = (new Date).toJSON();
                     if (timeNow < doc.locked_until) {
@@ -40,26 +40,38 @@ function getItems(db, num_desired, item_timeout, respond) {
                     }
                 }
                 
+                if (pendingClaims[row.id]) {
+                    return yieldItem(null);
+                }
+                
+                if (num_attempted >= params.num_desired) {
+                    return yieldItem(null);
+                }
+                
                 doc.locked_until = new Date(Date.now() + 1000 * item_timeout).toJSON();
                 db.http("PUT", doc, doc._id, null, function (status, response) {
                     if (status === 201) {
                         doc._rev = response.rev;
                         yieldItem({ticket:JSON.stringify([doc._id, doc._rev]), value:doc.value});
-                        num_found += 1;
                     } else {
+                        console.log("Failed to grab desired job!");
                         yieldItem(null);
                     }
+                    // hack to avoid another in-flight _all_docs request from trying job right after we've given it out
+                    setTimeout(function () { delete pendingClaims[row.id]; }, 500 * item_timeout);
                 });
+                pendingClaims[row.id] = true;
+                num_attempted += 1;
             });
         });
     }
     
     var items = [];
     var deadline = Date.now() + 250;    // gather items for a quarter second tops
-    var num_needed = num_desired, limit = num_desired * APPROX_NUM_CLIENTS, start = null;
+    var num_needed = num_desired, limit = num_desired * APPROX_NUM_CLIENTS, start = null, retries = 0;
     function attempt() {
         var remainingItems, fetchCount;
-        gather({limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
+        gather({num_desired:num_needed, limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
             remainingItems -= 1;
             if (item) {
                 items.push(item);
@@ -68,7 +80,8 @@ function getItems(db, num_desired, item_timeout, respond) {
             if (remainingItems < 1) {
                 num_needed = Math.max(num_desired - items.length, 0);
                 if (start && num_needed && Date.now() < deadline) {
-                    console.log("RETRY on fetch of", num_desired, "items (" + items.length, "found so far)");
+                    retries += 1;
+                    console.log("RETRY", retries, "on fetch");
                     process.nextTick(attempt);
                 } else {
                     if (start && num_needed) {
