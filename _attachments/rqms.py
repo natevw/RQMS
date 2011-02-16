@@ -1,6 +1,7 @@
 '''Python client library for RQMS'''
 
 import httplib
+from socket import error as socket_error
 from urlparse import urlparse
 import json
 from collections import deque
@@ -27,6 +28,8 @@ class Queue(object):
         while True:
             try:
                 return getattr(self, '_'+method)(*args, **kwargs)
+            except socket_error as e:
+                pass
             except httplib.HTTPException as e:
                 pass
             except IOError as e:
