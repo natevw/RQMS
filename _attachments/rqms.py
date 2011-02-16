@@ -1,7 +1,6 @@
 '''Python client library for RQMS'''
 
 import httplib
-from socket import error as socket_error
 from urlparse import urlparse
 import json
 from collections import deque
@@ -28,12 +27,11 @@ class Queue(object):
         while True:
             try:
                 return getattr(self, '_'+method)(*args, **kwargs)
-            except socket_error as e:
-                pass
-            except httplib.HTTPException as e:
-                pass
-            except IOError as e:
-                pass
+            except Exception as e:
+                if isinstance(e, AssertionError):
+                    raise
+                else:
+                    pass
             if (retry_count < 8):
                 logging.warn("Bad response from server for RQMS %s, retrying in a moment [%s, attempt #%u]", method, e, retry_count)
                 sleep(0.5)
