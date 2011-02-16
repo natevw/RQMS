@@ -9,15 +9,12 @@ function putItem(db, id, value, asyncReturn) {
     doc.timestamp = (new Date).toJSON();
     doc.value = value;
     db.http("PUT", doc, id, null, function (status, response) {
-        if (status !== 201) {
-            console.log("PUT error:", status, response);
-        }
-        asyncReturn(status === 201, response);
+        asyncReturn(status === 201, status, response);
     });
 }
 function deleteItem(db, id, rev, asyncReturn) {
     db.http("DELETE", null, id, {'rev':rev}, function (status, response) {
-        asyncReturn(status === 200, response);
+        asyncReturn(status === 200, status, response);
     });
 }
 function getItems(db, num_desired, item_timeout, respond) {
@@ -89,6 +86,10 @@ var couch = require('./couch.node.js');
 var fakeDB = new couch.Database(SERVER + "for_uuids");
 
 couch.External2(function (req, respond) {
+    if (0 && Math.random() > 0.75) {
+        respond({code:500, body:"CHAOS MONKEY-ED!"});
+    }
+    
     if (req.path.indexOf("favicon.ico") !== -1) {
         respond({code:404, body:"What a daft browser you really are!"});
         return;
@@ -105,11 +106,13 @@ couch.External2(function (req, respond) {
             respond({code:400, body:"I'm sorry, but that sort of language simply will not do."});
             return;
         }
-        deleteItem(db, ticket[0], ticket[1], function (deleted) {
+        deleteItem(db, ticket[0], ticket[1], function (deleted, code) {
             if (deleted) {
                 respond({body:"Well done, sir!"});
-            } else {
+            } else if (code === 409) {
                 respond({code:409, body:"You may have let me know in a more timely fashion."});
+            } else {
+                respond({code:500, body:"Dear me!"});
             }
         });
     } else if (req.method === "POST") {
@@ -120,11 +123,11 @@ couch.External2(function (req, respond) {
             respond({code:400, body:"That's not all the Queen's English now, is it?"});
             return;
         }
-        putItem(db, req.uuid, value, function (added) {
+        putItem(db, req.uuid, value, function (added, code) {
             if (added) {
                 respond({code:201, body:"It shall be done."});
             } else {
-                respond({code:409, body:"Dear me!"});
+                respond({code:500, body:"Dear me!"});
             }
         });
     } else {
