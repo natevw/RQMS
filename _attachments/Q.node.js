@@ -61,10 +61,13 @@ function getItems(db, num_desired, item_timeout, respond) {
             
             if (remainingItems < 1) {
                 limit = num_desired - items.length;
-                if (fetchCount == num_desired && limit && Date.now() < deadline) {
+                if (fetchCount === num_desired && limit && Date.now() < deadline) {
                     console.log("RETRY on", num_desired, "items, skip now", skip);
                     process.nextTick(attempt);
                 } else {
+                    if (fetchCount === num_desired && limit) {
+                        console.log("DEADLINE reached, returning items found so far");
+                    }
                     respond({json:{items:items}});
                 }
             }
