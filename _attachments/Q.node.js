@@ -88,6 +88,7 @@ var fakeDB = new couch.Database(SERVER + "for_uuids");
 couch.External2(function (req, respond) {
     if (0 && Math.random() > 0.75) {
         respond({code:500, body:"CHAOS MONKEY-ED!"});
+        return;
     }
     
     if (req.path.indexOf("favicon.ico") !== -1) {
