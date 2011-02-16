@@ -1,5 +1,6 @@
 var SERVER = "http://localhost:5984/";
 var Q_TYPE = "net.stemstorage.queue-item";
+var APPROX_NUM_CLIENTS = 4;
 
 
 // queue primitives
@@ -19,6 +20,7 @@ function deleteItem(db, id, rev, asyncReturn) {
 }
 function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
+        var num_found = 0;
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
             var nextRow = (response.rows.length > 1) ? response.rows.pop() : null;
             returnCount(response.rows.length || 1, nextRow && nextRow.id);
@@ -43,6 +45,9 @@ function getItems(db, num_desired, item_timeout, respond) {
                     if (status === 201) {
                         doc._rev = response.rev;
                         yieldItem({ticket:JSON.stringify([doc._id, doc._rev]), value:doc.value});
+                        num_found += 1;
+                    } else {
+                        yieldItem(null);
                     }
                 });
             });
@@ -51,7 +56,7 @@ function getItems(db, num_desired, item_timeout, respond) {
     
     var items = [];
     var deadline = Date.now() + 250;    // gather items for a quarter second tops
-    var limit = num_desired, start = null;
+    var num_needed = num_desired, limit = num_desired * APPROX_NUM_CLIENTS, start = null;
     function attempt() {
         var remainingItems, fetchCount;
         gather({limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
@@ -61,12 +66,12 @@ function getItems(db, num_desired, item_timeout, respond) {
             }
             
             if (remainingItems < 1) {
-                limit = num_desired - items.length;
-                if (start && limit && Date.now() < deadline) {
-                    console.log("RETRY on fetch of", num_desired, "items");
+                num_needed = Math.max(num_desired - items.length, 0);
+                if (start && num_needed && Date.now() < deadline) {
+                    console.log("RETRY on fetch of", num_desired, "items (" + items.length, "found so far)");
                     process.nextTick(attempt);
                 } else {
-                    if (start && limit) {
+                    if (start && num_needed) {
                         console.log("DEADLINE reached, returning items found so far");
                     } else if (!start) {
                         console.log("NO MORE items available");
@@ -86,7 +91,7 @@ var couch = require('./couch.node.js');
 var fakeDB = new couch.Database(SERVER + "for_uuids");
 
 couch.External2(function (req, respond) {
-    if (0 && Math.random() > 0.75) {
+    if (0 && Math.random() > 0.5) {
         respond({code:500, body:"CHAOS MONKEY-ED!"});
         return;
     }

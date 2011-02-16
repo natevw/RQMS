@@ -27,12 +27,15 @@ class Queue(object):
         while True:
             try:
                 return getattr(self, '_'+method)(*args, **kwargs)
+            except httplib.HTTPException as e:
+                pass
             except IOError as e:
-                if (retry_count < 8):
-                    logging.warn("Bad response from server for RQMS %s, retrying in a moment [%s, attempt #%u]", method, e, retry_count)
-                    sleep(0.5)
-                else:
-                    raise
+                pass
+            if (retry_count < 8):
+                logging.warn("Bad response from server for RQMS %s, retrying in a moment [%s, attempt #%u]", method, e, retry_count)
+                sleep(0.5)
+            else:
+                raise e
             retry_count += 1
     
     def _put(self, item):
