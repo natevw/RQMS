@@ -1,5 +1,6 @@
 function Database(db_url) {
     this.url = db_url;
+    this._uuid_cache = []
     
     var http = require('http');
     var url = require('url');
@@ -10,7 +11,7 @@ function Database(db_url) {
         var req_options = {host:db.hostname, port:db.port};
         req_options.method = method;
         req_options.headers = {'Content-Type': "application/json"};
-        req_options.path = req_url.pathname + (req_url.search || '');
+        req_options.path = url.resolve('/', req_url.pathname) + (req_url.search || '');
         return http.request(req_options, callback);
     };
 }
@@ -50,6 +51,23 @@ Database.prototype.get = function (path, query, callback) {
     this.http("GET", null, path, query, function (status, result) {
         callback((status === 200) ? result : null);
     });
+};
+
+Database.prototype.uuid = function(callback) {
+    if (this._uuid_cache.length) {
+        callback(this._uuid_cache.shift());
+        callback = null;
+    }
+    
+    if (!this._uuid_cache.fetching && this._uuid_cache.length < 10) {
+        this._uuid_cache.fetching = true;
+        this.get("../_uuids", {count:100}, (function (response) {
+            this._uuid_cache = response.uuids;
+            if (callback) {
+                callback(this._uuid_cache.shift());
+            }
+        }).bind(this));
+    }
 };
 
 
@@ -105,7 +123,7 @@ function External2(callback, options) {
                 res.end(JSON.stringify({error:true, message:"Internal error processing request"}), 'utf8');
                 waiting = null;
             }, 2000);
-            callback(wrappedReq, function (wrappedRes) {
+            function respond(wrappedRes) {
                 if (!waiting) {
                     // request has already failed
                     return;
@@ -132,6 +150,11 @@ function External2(callback, options) {
                 } else {
                     res.end();
                 }
+            }
+            
+            options.db.uuid(function (uuid) {
+                wrappedReq.uuid = uuid;
+                callback(wrappedReq, respond);
             });
         });
     });
