@@ -4,6 +4,7 @@ import httplib
 from urlparse import urlparse
 import json
 from collections import deque
+from time import sleep
 
 class Queue(object):
     '''Simple wrapper to fetch jobs from RQMS server via a URL like http://localhost:7085/tasks'''
@@ -32,7 +33,7 @@ class Queue(object):
             self.update(server_item['value'])
     
     def get(self):
-        if not len(self._batch):
+        while not len(self._batch):
             c = self._conn()
             c.request('GET', self.url + "?count=%u&time=%f" % (self.batch_size, self.time))
             resp = c.getresponse()
@@ -40,13 +41,15 @@ class Queue(object):
                 raise IOError("Failed to get items")
             for item in json.loads(resp.read())['items']:
                 self._batch.append(self._DequeuedItem(item))
+            if not len(self._batch):
+                sleep(1.0)
         return self._batch.popleft()
     
     def task_done(self, item):
         c = self._conn()
-        c.request('DELETE', self.url, json.dumps(item.ticket), {'Content-Type':"application/json"})
+        c.request('DELETE', self.url, item.ticket, {'Content-Type':"application/json"})
         resp = c.getresponse()
         if resp.status == 409:
-            raise Error("Job not finished in time")
+            raise AssertionError("Job performed multiple times")
         elif resp.status != 200:
             raise IOError("Failed to remove item")
