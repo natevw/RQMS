@@ -55,14 +55,14 @@ class Queue(object):
             c.request('GET', self.url + "?count=%u&time=%f" % (self.batch_size, self.time))
             resp = c.getresponse()
             if resp.status != 200:
-                raise IOError("Failed to get items")
+                raise IOError("Failed to get items (%u, %s)" % (resp.status, resp.read()))
             for item in json.loads(resp.read())['items']:
                 self._batch.append(self._DequeuedItem(item))
             if not len(self._batch):
                 sleep(1.0)
         return self._batch.popleft()
     def get(self):
-        return self._try('get', item)
+        return self._try('get')
     
     def _task_done(self, item):
         c = self._conn()
