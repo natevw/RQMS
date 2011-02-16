@@ -115,7 +115,7 @@ couch.External2(function (req, respond) {
         deleteItem(db, ticket[0], ticket[1], function (deleted, code) {
             if (deleted) {
                 respond({body:"Well done, sir!"});
-            } else if (code === 409) {
+            } else if (code === 409 || code === 404) {
                 respond({code:409, body:"You may have let me know in a more timely fashion."});
             } else {
                 respond({code:500, body:"Dear me!"});
