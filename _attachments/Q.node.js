@@ -1,6 +1,5 @@
 var SERVER = "http://localhost:5984/";
 var Q_TYPE = "net.stemstorage.queue-item";
-var APPROX_NUM_CLIENTS = 4;
 
 
 // queue primitives
@@ -68,7 +67,7 @@ function getItems(db, num_desired, item_timeout, respond) {
     
     var items = [];
     var deadline = Date.now() + 250;    // gather items for a quarter second tops
-    var num_needed = num_desired, limit = num_desired * APPROX_NUM_CLIENTS, start = null, retries = 0;
+    var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), start = null, retries = 0;
     function attempt() {
         var remainingItems, fetchCount;
         gather({num_desired:num_needed, limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
