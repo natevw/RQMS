@@ -20,9 +20,9 @@ function deleteItem(db, id, rev, asyncReturn) {
 function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
-            var lastRow = response.rows.pop();
-            returnCount(response.rows.length, lastRow.id);
-            if (!lastRow) {
+            var nextRow = (response.rows.length > 1) ? response.rows.pop() : null;
+            returnCount(response.rows.length || 1, nextRow && nextRow.id);
+            if (!response.rows.length) {
                 yieldItem(null);
             }
             response.rows.forEach(function (row) {
@@ -62,12 +62,14 @@ function getItems(db, num_desired, item_timeout, respond) {
             
             if (remainingItems < 1) {
                 limit = num_desired - items.length;
-                if (fetchCount === num_desired && limit && Date.now() < deadline) {
+                if (start && limit && Date.now() < deadline) {
                     console.log("RETRY on fetch of", num_desired, "items");
                     process.nextTick(attempt);
                 } else {
-                    if (fetchCount === num_desired && limit) {
+                    if (start && limit) {
                         console.log("DEADLINE reached, returning items found so far");
+                    } else if (!start) {
+                        console.log("NO MORE items available");
                     }
                     respond({json:{items:items}});
                 }
@@ -119,11 +121,13 @@ couch.External2(function (req, respond) {
         }
         putItem(db, req.uuid, value, function (added) {
             if (added) {
-                respond({body:"It shall be done.\n"});
+                respond({code:201, body:"It shall be done.\n"});
             } else {
                 respond({code:409, body:"Dear me!\n"});
             }
         });
+    } else {
+        respond({code:400, body:"Kindly stop spinning about me.\n"});
     }
     
 }, {port:7085, db:fakeDB});
