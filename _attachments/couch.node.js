@@ -61,7 +61,7 @@ Database.prototype.uuid = function(callback) {
     
     if (!this._uuid_cache.fetching && this._uuid_cache.length < 10) {
         this._uuid_cache.fetching = true;
-        this.get("../_uuids", {count:100}, (function (response) {
+        this.get("../_uuids", {count:2500}, (function (response) {
             this._uuid_cache = response.uuids;
             if (callback) {
                 callback(this._uuid_cache.shift());

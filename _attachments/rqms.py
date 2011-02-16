@@ -25,7 +25,7 @@ class Queue(object):
         c.request('POST', self.url, json.dumps(item), {'Content-Type':"application/json"})
         resp = c.getresponse()
         if resp.status != 201:
-            raise IOError("Failed to post item")
+            raise IOError("Failed to post item (%u, %s)" % (resp.status, resp.read()))
     
     class _DequeuedItem(dict):
         def __init__(self, server_item):
@@ -52,4 +52,4 @@ class Queue(object):
         if resp.status == 409:
             raise AssertionError("Job performed multiple times")
         elif resp.status != 200:
-            raise IOError("Failed to remove item")
+            raise IOError("Failed to remove item (%u, %s)" % (resp.status, resp.read()))

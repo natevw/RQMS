@@ -9,6 +9,9 @@ function putItem(db, id, value, asyncReturn) {
     doc.timestamp = (new Date).toJSON();
     doc.value = value;
     db.http("PUT", doc, id, null, function (status, response) {
+        if (status !== 201) {
+            console.log("PUT error:", status, response);
+        }
         asyncReturn(status === 201, response);
     });
 }
@@ -86,10 +89,8 @@ var couch = require('./couch.node.js');
 var fakeDB = new couch.Database(SERVER + "for_uuids");
 
 couch.External2(function (req, respond) {
-    //return respond({body:"<h1>Hello World!</h1>\n<pre>\n" + JSON.stringify(req, null, 4) + "</pre>"});
-    
     if (req.path.indexOf("favicon.ico") !== -1) {
-        respond({code:404, body:"What a daft browser you really are!\n"});
+        respond({code:404, body:"What a daft browser you really are!"});
         return;
     }
     
@@ -101,14 +102,14 @@ couch.External2(function (req, respond) {
         try {
             ticket = JSON.parse(req.body);
         } catch (e) {
-            respond({code:400, body:"I'm sorry, but that sort of language simply will not do.\n"});
+            respond({code:400, body:"I'm sorry, but that sort of language simply will not do."});
             return;
         }
         deleteItem(db, ticket[0], ticket[1], function (deleted) {
             if (deleted) {
-                respond({body:"Well done, sir!\n"});
+                respond({body:"Well done, sir!"});
             } else {
-                respond({code:409, body:"You may have let me know in a more timely fashion.\n"});
+                respond({code:409, body:"You may have let me know in a more timely fashion."});
             }
         });
     } else if (req.method === "POST") {
@@ -116,18 +117,18 @@ couch.External2(function (req, respond) {
         try {
             value = JSON.parse(req.body);
         } catch (e) {
-            respond({code:400, body:"That's not all the Queen's English now, is it?\n"});
+            respond({code:400, body:"That's not all the Queen's English now, is it?"});
             return;
         }
         putItem(db, req.uuid, value, function (added) {
             if (added) {
-                respond({code:201, body:"It shall be done.\n"});
+                respond({code:201, body:"It shall be done."});
             } else {
-                respond({code:409, body:"Dear me!\n"});
+                respond({code:409, body:"Dear me!"});
             }
         });
     } else {
-        respond({code:400, body:"Kindly stop spinning about me.\n"});
+        respond({code:400, body:"Kindly stop spinning about me."});
     }
     
 }, {port:7085, db:fakeDB});
