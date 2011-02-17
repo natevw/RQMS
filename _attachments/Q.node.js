@@ -66,7 +66,16 @@ function getItems(db, num_desired, item_timeout, respond) {
     }
     
     var items = [];
-    var deadline = Date.now() + 250;    // gather items for a quarter second tops
+    var deadline = Date.now() + 250;    // re-try item gathering for a quarter second tops
+    var compaction = setTimeout(function () {   // trigger database compaction if first gather attempt goes past deadline
+        db.http('POST', null, "_compact", null, function (status, response) {
+            if (status === 202) {
+                console.log("COMPACTION requested for database");
+            } else {
+                console.log("FAILED to start compaction:", response);
+            }
+        });
+    }, 300);
     var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), start = null, retries = 0;
     function attempt() {
         var remainingItems, fetchCount;
@@ -89,6 +98,7 @@ function getItems(db, num_desired, item_timeout, respond) {
                         console.log("NO MORE items available");
                     }
                     respond({json:{items:items}});
+                    clearTimeout(compaction);
                 }
             }
         });
