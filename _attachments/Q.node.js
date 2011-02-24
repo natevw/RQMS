@@ -22,11 +22,8 @@ function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
         var num_attempted = 0;
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
-            var nextRow = (response.rows.length > 1) ? response.rows.pop() : null;
-            returnCount(response.rows.length || 1, nextRow && nextRow.id);
-            if (!response.rows.length) {
-                return yieldItem(null);
-            }
+            var nextRow = (response.rows.length > params.limit) ? response.rows.pop() : null;
+            returnCount(response.rows.length, nextRow && nextRow.id);
             response.rows.forEach(function (row) {
                 var doc = row.doc;
                 if (!doc[Q_TYPE]) {
@@ -57,7 +54,7 @@ function getItems(db, num_desired, item_timeout, respond) {
                         yieldItem(null);
                     }
                     // hack to avoid another in-flight _all_docs request from trying job right after we've given it out
-                    setTimeout(function () { delete pendingClaims[row.id]; }, 500 * item_timeout);
+                    setTimeout(function () { delete pendingClaims[row.id]; }, 1000 * Math.min(5, item_timeout / 2));
                 });
                 pendingClaims[row.id] = true;
                 num_attempted += 1;
@@ -76,10 +73,17 @@ function getItems(db, num_desired, item_timeout, respond) {
             }
         });
     }, 300);
-    var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), start = null, retries = 0;
+    var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), next = null, retries = 0;
     function attempt() {
-        var remainingItems, fetchCount;
-        gather({num_desired:num_needed, limit:limit, start:start}, function (count, next) { remainingItems = fetchCount = count; start = next; }, function (item) {
+        var remainingItems;
+        gather({num_desired:num_needed, limit:limit, start:next}, function (count, nextId) {
+            if (!count) {
+                respond({json:{items:[]}});
+            } else {
+                remainingItems = count;
+                next = nextId;
+            }
+        }, function (item) {
             remainingItems -= 1;
             if (item) {
                 items.push(item);
@@ -87,15 +91,15 @@ function getItems(db, num_desired, item_timeout, respond) {
             
             if (remainingItems < 1) {
                 num_needed = Math.max(num_desired - items.length, 0);
-                if (start && num_needed && Date.now() < deadline) {
+                if (next && num_needed && Date.now() < deadline) {
                     retries += 1;
                     console.log("RETRY", retries, "on fetch");
                     process.nextTick(attempt);
                 } else {
-                    if (start && num_needed) {
+                    if (next && num_needed) {
                         console.log("DEADLINE reached, returning items found so far");
-                    } else if (!start) {
-                        console.log("NO MORE items available");
+                    } else if (!next && num_needed) {
+                        console.log("NO MORE items available, returning items found so far");
                     }
                     respond({json:{items:items}});
                     clearTimeout(compaction);
