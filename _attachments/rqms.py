@@ -6,6 +6,8 @@ import json
 from collections import deque
 from time import sleep
 import logging
+from uuid import uuid4
+import base64
 
 class Queue(object):
     '''Simple wrapper to fetch jobs from RQMS server via a URL like http://localhost:7085/tasks'''
@@ -16,6 +18,9 @@ class Queue(object):
         self.time = time
         self.batch_size = batch_size
         self._batch = deque()
+        self.job_prefix = base64.urlsafe_b64encode(uuid4().bytes)[:-2]
+        self.job_count = 0
+        
     
     def _conn(self):
         Con = httplib.HTTPSConnection if self.url_parts.scheme == 'https' else httplib.HTTPConnection
@@ -39,14 +44,16 @@ class Queue(object):
                 raise e
             retry_count += 1
     
-    def _put(self, item):
+    def _put(self, item, jobid):
         c = self._conn()
-        c.request('POST', self.url, json.dumps(item), {'Content-Type':"application/json"})
+        c.request('POST', self.url + "?id=%s" % jobid, json.dumps(item), {'Content-Type':"application/json"})
         resp = c.getresponse()
         if resp.status != 201:
             raise IOError("Failed to post item (%u, %s)" % (resp.status, resp.read()))
     def put(self, item):
-        return self._try('put', item)
+        jobid = "%s__%u" % (self.job_prefix, self.job_count)
+        self.job_count += 1
+        return self._try('put', item, jobid)
     
     class _DequeuedItem(dict):
         def __init__(self, server_item):

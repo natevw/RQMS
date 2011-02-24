@@ -110,7 +110,6 @@ function getItems(db, num_desired, item_timeout, respond) {
 
 
 var couch = require('./couch.node.js');
-var fakeDB = new couch.Database(SERVER + "for_uuids");
 
 couch.External2(function (req, respond) {
     if (0 && Math.random() > 0.5) {
@@ -151,7 +150,7 @@ couch.External2(function (req, respond) {
             respond({code:400, body:"That's not all the Queen's English now, is it?"});
             return;
         }
-        putItem(db, req.uuid, value, function (added, code) {
+        putItem(db, req.query.id, value, function (added, code) {
             if (added) {
                 respond({code:201, body:"It shall be done."});
             } else {
@@ -162,4 +161,4 @@ couch.External2(function (req, respond) {
         respond({code:400, body:"Kindly stop spinning about me."});
     }
     
-}, {port:7085, db:fakeDB});
+}, {port:7085});
