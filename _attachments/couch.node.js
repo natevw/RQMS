@@ -152,10 +152,27 @@ function External2(callback, options) {
                 }
             }
             
-            options.db.uuid(function (uuid) {
-                wrappedReq.uuid = uuid;
+            if (options.db_info && options.uuids) {
+                options.db.uuid(function (uuid) {
+                    wrappedReq.uuid = uuid;
+                    options.db.get("/", null, function (dbinfo) {
+                        wrappedReq.info = dbinfo;
+                        callback(wrappedReq, respond);
+                    });
+                });
+            } else if (options.db_info) {
+                options.db.get("/", null, function (dbinfo) {
+                    wrappedReq.info = dbinfo;
+                    callback(wrappedReq, respond);
+                });
+            } if (options.uuids) {
+                options.db.uuid(function (uuid) {
+                    wrappedReq.uuid = uuid;
+                    callback(wrappedReq, respond);
+                });
+            } else {
                 callback(wrappedReq, respond);
-            });
+            }
         });
     });
     server.listen(options.port, options.host);
