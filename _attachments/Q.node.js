@@ -77,6 +77,7 @@ function getItems(db, num_desired, item_timeout, respond) {
     function attempt() {
         var remainingItems;
         gather({num_desired:num_needed, limit:limit, start:next}, function (count, nextId) {
+            clearTimeout(compaction);
             if (!count) {
                 respond({json:{items:[]}});
             } else {
@@ -102,7 +103,6 @@ function getItems(db, num_desired, item_timeout, respond) {
                         console.log("NO MORE items available, returning items found so far");
                     }
                     respond({json:{items:items}});
-                    clearTimeout(compaction);
                 }
             }
         });
