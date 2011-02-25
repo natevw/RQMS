@@ -33,7 +33,7 @@ class Queue(object):
             try:
                 return getattr(self, '_'+method)(*args, **kwargs)
             except Exception as e:
-                if isinstance(e, AssertionError):
+                if isinstance(e, AssertionError) and not retry_count:
                     raise
                 else:
                     pass
