@@ -67,7 +67,7 @@ function getItems(db, num_desired, item_timeout, respond) {
     var compaction = setTimeout(function () {   // trigger database compaction if first gather attempt goes past deadline
         db.http('POST', null, "_compact", null, function (status, response) {
             if (status === 202) {
-                console.log("COMPACTION requested for database");
+                console.log("COMPACTION requested for database", db.url);
             } else {
                 console.log("FAILED to start compaction:", response);
             }
