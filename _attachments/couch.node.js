@@ -122,7 +122,7 @@ function External2(callback, options) {
                 res.writeHead(500, {'Content-Type':'application/json'});
                 res.end(JSON.stringify({error:true, message:"Internal error processing request"}), 'utf8');
                 waiting = null;
-            }, 2000);
+            }, 5000);
             function respond(wrappedRes) {
                 if (!waiting) {
                     // request has already failed
