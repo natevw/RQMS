@@ -18,7 +18,7 @@ class Queue(object):
         self.time = time
         self.batch_size = batch_size
         self._batch = deque()
-        self.job_prefix = base64.urlsafe_b64encode(uuid4().bytes)[:-2]
+        self.job_sourceid = base64.urlsafe_b64encode(uuid4().bytes)[:-2]
         self.job_count = 0
         
     
@@ -51,7 +51,7 @@ class Queue(object):
         if resp.status != 201:
             raise IOError("Failed to post item (%u, %s)" % (resp.status, resp.read()))
     def put(self, item):
-        jobid = "%s__%u" % (self.job_prefix, self.job_count)
+        jobid = "item-%09u-%s" % (self.job_count, self.job_sourceid)
         self.job_count += 1
         return self._try('put', item, jobid)
     
