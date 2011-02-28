@@ -1,5 +1,6 @@
 var SERVER = "http://localhost:5984/";
 var Q_TYPE = "net.stemstorage.queue-item";
+var PURGE_ITEMS = true;   // see https://issues.apache.org/jira/browse/COUCHDB-1076
 
 
 // queue primitives
@@ -13,9 +14,16 @@ function putItem(db, id, value, asyncReturn) {
     });
 }
 function deleteItem(db, id, rev, asyncReturn) {
-    db.http("DELETE", null, id, {'rev':rev}, function (status, response) {
+    function handleResult(status, response) {
         asyncReturn(status === 200, status, response);
-    });
+    }
+    if (PURGE_ITEMS) {
+        var data = {};
+        data[id] = [rev];
+        db.http("POST", data, "_purge", null, handleResult);
+    } else {
+        db.http("DELETE", null, id, {'rev':rev}, handleResult);
+    }
 }
 var pendingClaims = {};
 function getItems(db, num_desired, item_timeout, respond) {
@@ -64,20 +72,10 @@ function getItems(db, num_desired, item_timeout, respond) {
     
     var items = [];
     var deadline = Date.now() + 250;    // re-try item gathering for a quarter second tops
-    var compaction = setTimeout(function () {   // trigger database compaction if first gather attempt goes past deadline
-        db.http('POST', null, "_compact", null, function (status, response) {
-            if (status === 202) {
-                console.log("COMPACTION requested for database", db.url);
-            } else {
-                console.log("FAILED to start compaction:", response);
-            }
-        });
-    }, 300);
     var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), next = null, retries = 0;
     function attempt() {
         var remainingItems;
         gather({num_desired:num_needed, limit:limit, start:next}, function (count, nextId) {
-            clearTimeout(compaction);
             if (!count) {
                 respond({json:{items:[]}});
             } else {
