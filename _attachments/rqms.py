@@ -87,3 +87,19 @@ class Queue(object):
             raise IOError("Failed to remove item (%u, %s)" % (resp.status, resp.read()))
     def task_done(self, item):
         return self._try('task_done', item)
+    
+    
+    def foreach(self, process_item, catch_errors=False):
+        while True:
+            logging.debug("Fetching next item (%u buffered locally)", len(self._batch))
+            item = self.get()
+            
+            try:
+                process_item(item)
+            except Exception as e:
+                logging.error("Error processing %s: %s", item.value, e)
+                if not catch_errors:
+                    raise
+            else:
+                self.task_done(item)
+                logging.debug("Successfully processed %s", item)
