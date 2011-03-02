@@ -62,7 +62,7 @@ function getItems(db, num_desired, item_timeout, respond) {
                         yieldItem(null);
                     }
                     // hack to avoid another in-flight _all_docs request from trying job right after we've given it out
-                    setTimeout(function () { delete pendingClaims[row.id]; }, 1000 * Math.min(5, item_timeout / 2));
+                    setTimeout(function () { delete pendingClaims[row.id]; }, 1000 * (item_timeout / 2));
                 });
                 pendingClaims[row.id] = true;
                 num_attempted += 1;
