@@ -44,16 +44,28 @@ class Queue(object):
                 raise e
             retry_count += 1
     
+    
     def _put(self, item, jobid):
         c = self._conn()
         c.request('POST', self.url + "?id=%s" % jobid, json.dumps(item), {'Content-Type':"application/json"})
         resp = c.getresponse()
         if resp.status != 201:
-            raise IOError("Failed to post item (%u, %s)" % (resp.status, resp.read()))
+            raise IOError("Failed to add item (%u, %s)" % (resp.status, resp.read()))
     def put(self, item):
         jobid = "item-%09u-%s" % (self.job_count, self.job_sourceid)
         self.job_count += 1
         return self._try('put', item, jobid)
+    
+    
+    def _set(self, jobid, item):
+        c = self._conn()
+        c.request('PUT', self.url + "/%s" % jobid, json.dumps(item), {'Content-Type':"application/json"})
+        resp = c.getresponse()
+        if resp.status != 201:
+            raise IOError("Failed to set item (%u, %s)" % (resp.status, resp.read()))
+    def set(self, item, jobid):
+        return self._try('set', item, jobid)
+    
     
     class _DequeuedItem(dict):
         def __init__(self, server_item):

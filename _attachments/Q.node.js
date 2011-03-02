@@ -5,14 +5,30 @@ var PURGE_ITEMS = true;   // see https://issues.apache.org/jira/browse/COUCHDB-1
 
 
 // queue primitives
-function putItem(db, id, value, asyncReturn) {
+function putItem(db, id, rev, value, asyncReturn) {
     var doc = {};
     doc[Q_TYPE] = true;
+    if (rev) {
+        doc._rev = rev;
+    }
     doc.timestamp = (new Date).toJSON();
     doc.value = value;
     db.http("PUT", doc, id, null, function (status, response) {
         asyncReturn(status === 201, status, response);
     });
+}
+function setItem(db, id, value, asyncReturn) {
+    function retryOnConflict(success, status, response) {
+        if (!success && status === 409) {
+            db.get(id, null, function (currentDoc) {
+                console.log("Overwriting item", id);
+                putItem(db, id, currentDoc && currentDoc._rev, value, retryOnConflict);
+            });
+        } else {
+            asyncReturn(success, status, response);
+        }
+    }
+    putItem(db, id, null, value, retryOnConflict);
 }
 function deleteItem(db, id, rev, asyncReturn) {
     function handleResult(status, response) {
@@ -142,7 +158,7 @@ couch.External2(function (req, respond) {
             } else if (code === 409 || code === 404) {
                 respond({code:409, body:"You may have let me know in a more timely fashion."});
             } else {
-                respond({code:500, body:"Dear me!"});
+                respond({code:500, body:"That didn't end so well."});
             }
         });
     } else if (req.method === "POST") {
@@ -153,11 +169,26 @@ couch.External2(function (req, respond) {
             respond({code:400, body:"That's not all the Queen's English now, is it?"});
             return;
         }
-        putItem(db, req.query.id, value, function (added, code) {
+        putItem(db, req.query.id, null, value, function (added, code) {
             if (added) {
                 respond({code:201, body:"It shall be done."});
             } else {
                 respond({code:500, body:"Dear me!"});
+            }
+        });
+    } else if (req.method === "PUT") {
+        var value;
+        try {
+            value = JSON.parse(req.body);
+        } catch (e) {
+            respond({code:400, body:"That's not all the Queen's English now, is it?"});
+            return;
+        }
+        setItem(db, req.path[1], value, function (set, code) {
+            if (set) {
+                respond({code:201, body:"Well spoken."});
+            } else {
+                respond({code:500, body:"I'm afraid that didn't work."});
             }
         });
     } else {
