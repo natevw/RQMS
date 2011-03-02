@@ -1,4 +1,5 @@
 var SERVER = "http://localhost:5984/";
+var Q_PORT = 7085;
 var Q_TYPE = "net.stemstorage.queue-item";
 var PURGE_ITEMS = true;   // see https://issues.apache.org/jira/browse/COUCHDB-1076
 
@@ -163,4 +164,4 @@ couch.External2(function (req, respond) {
         respond({code:400, body:"Kindly stop spinning about me."});
     }
     
-}, {port:7085});
+}, {port:Q_PORT});
