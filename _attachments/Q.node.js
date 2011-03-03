@@ -46,6 +46,7 @@ var pendingClaims = {};
 function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
         var num_attempted = 0;
+        params.limit = params.num_desired + parseInt(Object.keys(pendingClaims).length / 2);
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
             var nextRow = (response.rows.length > params.limit) ? response.rows.pop() : null;
             returnCount(response.rows.length, nextRow && nextRow.id);
@@ -89,10 +90,10 @@ function getItems(db, num_desired, item_timeout, respond) {
     
     var items = [];
     var deadline = Date.now() + 250;    // re-try item gathering for a quarter second tops
-    var num_needed = num_desired, limit = num_desired + parseInt(Object.keys(pendingClaims).length / 2), next = null, retries = 0;
+    var num_needed = num_desired, next = null, retries = 0;
     function attempt() {
         var remainingItems;
-        gather({num_desired:num_needed, limit:limit, start:next}, function (count, nextId) {
+        gather({num_desired:num_needed, start:next}, function (count, nextId) {
             if (!count) {
                 respond({json:{items:[]}});
             } else {
