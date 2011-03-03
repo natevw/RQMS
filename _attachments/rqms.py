@@ -9,18 +9,20 @@ import logging
 from uuid import uuid4
 import base64
 
+
 class Queue(object):
     '''Simple wrapper to fetch jobs from RQMS server via a URL like http://localhost:7085/tasks'''
     
-    def __init__(self, url, time=30.0, batch_size=1):
+    def __init__(self, url, time=30.0, batch_size=1, multiple_ok=False):
         self.url = url
         self.url_parts = urlparse(url)
         self.time = time
         self.batch_size = batch_size
+        self.multiple_ok = multiple_ok
         self._batch = deque()
         self.job_sourceid = base64.urlsafe_b64encode(uuid4().bytes)[:-2]
         self.job_count = 0
-        
+    
     
     def _conn(self):
         Con = httplib.HTTPSConnection if self.url_parts.scheme == 'https' else httplib.HTTPConnection
@@ -33,10 +35,11 @@ class Queue(object):
             try:
                 return getattr(self, '_'+method)(*args, **kwargs)
             except Exception as e:
-                if isinstance(e, AssertionError) and not retry_count:
-                    raise
-                else:
-                    pass
+                if isinstance(e, self.DuplicateError):
+                    if not retry_count:
+                        raise
+                    else:
+                        return
             if (retry_count < 8):
                 logging.warn("Bad response from server for RQMS %s, retrying in a moment [%s, attempt #%u]", method, e, retry_count)
                 sleep(0.5)
@@ -89,12 +92,17 @@ class Queue(object):
     def get(self):
         return self._try('get')
     
+    class DuplicateError(AssertionError):
+        pass
+    
     def _task_done(self, item):
         c = self._conn()
         c.request('DELETE', self.url, item.ticket, {'Content-Type':"application/json"})
         resp = c.getresponse()
-        if resp.status == 409:
-            raise AssertionError("Job performed multiple times")
+        if resp.status == 409 and self.multiple_ok:
+            logging.info("Item modified while in progress")
+        elif resp.status == 409:
+            raise self.DuplicateError("Item processed multiple times")
         elif resp.status != 200:
             raise IOError("Failed to remove item (%u, %s)" % (resp.status, resp.read()))
     def task_done(self, item):
