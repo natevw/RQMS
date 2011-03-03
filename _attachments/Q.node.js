@@ -47,6 +47,9 @@ function getItems(db, num_desired, item_timeout, respond) {
     function gather(params, returnCount, yieldItem) {
         var num_attempted = 0;
         params.limit = params.num_desired + parseInt(Object.keys(pendingClaims).length / 2);
+        if (params.start) {
+            params.limit = Math.min(params.limit, params.num_desired * 2);
+        }
         db.get("_all_docs", {include_docs:true, $startkey:params.start, limit:(params.limit + 1)}, function (response) {
             var nextRow = (response.rows.length > params.limit) ? response.rows.pop() : null;
             returnCount(response.rows.length, nextRow && nextRow.id);
