@@ -98,7 +98,8 @@ function getItems(db, num_desired, item_timeout, respond) {
         var remainingItems;
         gather({num_desired:num_needed, start:next}, function (count, nextId) {
             if (!count) {
-                respond({json:{items:[]}});
+                console.log("NO ITEMS in queue");
+                respond({json:{items:items}});
             } else {
                 remainingItems = count;
                 next = nextId;
