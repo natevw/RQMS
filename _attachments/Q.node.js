@@ -31,15 +31,19 @@ function setItem(db, id, value, asyncReturn) {
     putItem(db, id, null, value, retryOnConflict);
 }
 function deleteItem(db, id, rev, asyncReturn) {
-    function handleResult(status, response) {
-        asyncReturn(status === 200, status, response);
-    }
     if (PURGE_ITEMS) {
         var data = {};
         data[id] = [rev];
-        db.http("POST", data, "_purge", null, handleResult);
+        db.http("POST", data, "_purge", null, function (status, response) {
+            if (status === 200 && !response.purged[id]) {
+                status = 409;
+            }
+            asyncReturn(status === 200, status, response);
+        });
     } else {
-        db.http("DELETE", null, id, {'rev':rev}, handleResult);
+        db.http("DELETE", null, id, {'rev':rev}, function (status, response) {
+            asyncReturn(status === 200, status, response);
+        });
     }
 }
 var pendingClaims = {};
