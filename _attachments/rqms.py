@@ -66,8 +66,8 @@ class Queue(object):
         resp = c.getresponse()
         if resp.status != 201:
             raise IOError("Failed to set item (%u, %s)" % (resp.status, resp.read()))
-    def set(self, item, jobid):
-        return self._try('set', item, jobid)
+    def set(self, jobid, item):
+        return self._try('set', jobid, item)
     
     
     class _DequeuedItem(dict):
